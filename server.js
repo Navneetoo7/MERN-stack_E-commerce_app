@@ -4,6 +4,11 @@ const connectToDB = require("./config/db");
 const PORT = process.env.PORT || 5000;
 
 connectToDB();
+
+app.use("/api/users", require("./routes/userApi"));
+app.use("/api/products", require("./routes/productApi"))
+
+
 app.get("/", (req, res)=>{
     res.send("my app is up");
 })
