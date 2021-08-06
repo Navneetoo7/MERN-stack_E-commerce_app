@@ -1,20 +1,25 @@
 const express = require("express");
 const router = express.Router();
-const { check, validationResult } = require("express-validator");
 const User = require("../models/Users");
+const auth = require("../middleware/Authorization");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { check, validationResult } = require("express-validator");
 const config = require("../config/keys");
 
-router.get("/", (req, res) => res.send("users router"));
+router.get("/", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    res.json(user);
+  } catch (error) {
+    console.error(error.message);
+  }
+});
 router.post(
   "/",
   [
-    check("name", "Name is required").not().isEmpty(),
     check("email", "Please enter a valid email").isEmail(),
-    check("password", "Password should have at least 5  charcters").isLength({
-      min: 5,
-    }),
+    check("password", "Password should have at least 5  charcters").exists(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -24,22 +29,22 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { name, email, password } = req.body;
+      const { email, password } = req.body;
       let user = await User.findOne({ email: email });
-      if (user) {
+      console.log(password, user.password);
+      if (!user) {
         return res
           .status(400)
-          .json({ errors: [{ msg: "user already exits" }] });
+          .json({ errors: [{ msg: `invalide user or password ${password}` }] });
       }
-      user = new User({
-        name,
-        email,
-        password,
-      });
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-      user.save();
-      //res.send("users create");
+      const match = await bcrypt.compare(password, user.password);
+
+      if (!match) {
+        return res
+          .status(400)
+          .json({ errors: [{ msg: "invalide user or password" }] });
+      }
+
       const payload = {
         user: {
           id: user.id,
@@ -60,5 +65,4 @@ router.post(
     }
   }
 );
-
 module.exports = router;
